@@ -1,4 +1,4 @@
-name: Build YTMD
+name: Build YouTube Music Downloader
 
 on:
   push:
@@ -64,24 +64,24 @@ jobs:
     - name: Build with PyInstaller (Windows)
       if: matrix.platform == 'windows'
       run: |
-        pyinstaller --onefile --name YTMD main.py
+        pyinstaller --onefile --name youtube-music-downloader --add-data="youtube_downloader;youtube_downloader" main.py
         
     - name: Build with PyInstaller (Linux/MacOS)
       if: matrix.platform != 'windows'
       run: |
-        pyinstaller --onefile --name YTMD main.py
+        pyinstaller --onefile --name youtube-music-downloader --add-data="youtube_downloader:youtube_downloader" main.py
         
     - name: Prepare distribution folder
       shell: bash
       run: |
-        mkdir -p "dist/${{ matrix.platform }}-${{ steps.arch.outputs.arch }}-YTMD"
+        mkdir -p "dist/${{ matrix.platform }}-${{ steps.arch.outputs.arch }}-youtube-music-downloader"
         if [ "${{ matrix.platform }}" = "windows" ]; then
-          cp dist/YTMD.exe "dist/${{ matrix.platform }}-${{ steps.arch.outputs.arch }}-YTMD/"
-          cp README.md LICENSE requirements.txt "dist/${{ matrix.platform }}-${{ steps.arch.outputs.arch }}-YTMD/"
+          cp dist/youtube-music-downloader.exe "dist/${{ matrix.platform }}-${{ steps.arch.outputs.arch }}-youtube-music-downloader/"
+          cp README.md LICENSE requirements.txt "dist/${{ matrix.platform }}-${{ steps.arch.outputs.arch }}-youtube-music-downloader/"
         else
-          cp dist/YTMD "dist/${{ matrix.platform }}-${{ steps.arch.outputs.arch }}-YTMD/"
-          cp README.md LICENSE requirements.txt "dist/${{ matrix.platform }}-${{ steps.arch.outputs.arch }}-YTMD/"
-          chmod +x "dist/${{ matrix.platform }}-${{ steps.arch.outputs.arch }}-YTMD/YTMD"
+          cp dist/youtube-music-downloader "dist/${{ matrix.platform }}-${{ steps.arch.outputs.arch }}-youtube-music-downloader/"
+          cp README.md LICENSE requirements.txt "dist/${{ matrix.platform }}-${{ steps.arch.outputs.arch }}-youtube-music-downloader/"
+          chmod +x "dist/${{ matrix.platform }}-${{ steps.arch.outputs.arch }}-youtube-music-downloader/youtube-music-downloader"
         fi
         
     - name: Create ZIP archive
@@ -89,16 +89,16 @@ jobs:
       run: |
         cd dist
         if [ "${{ matrix.platform }}" = "windows" ]; then
-          powershell Compress-Archive -Path "${{ matrix.platform }}-${{ steps.arch.outputs.arch }}-YTMD" -DestinationPath "${{ matrix.platform }}-${{ steps.arch.outputs.arch }}-YTMD.zip"
+          powershell Compress-Archive -Path "${{ matrix.platform }}-${{ steps.arch.outputs.arch }}-youtube-music-downloader" -DestinationPath "${{ matrix.platform }}-${{ steps.arch.outputs.arch }}-youtube-music-downloader.zip"
         else
-          zip -r "${{ matrix.platform }}-${{ steps.arch.outputs.arch }}-YTMD.zip" "${{ matrix.platform }}-${{ steps.arch.outputs.arch }}-YTMD"
+          zip -r "${{ matrix.platform }}-${{ steps.arch.outputs.arch }}-youtube-music-downloader.zip" "${{ matrix.platform }}-${{ steps.arch.outputs.arch }}-youtube-music-downloader"
         fi
         
     - name: Upload build artifact
       uses: actions/upload-artifact@v3
       with:
-        name: ${{ matrix.platform }}-${{ steps.arch.outputs.arch }}-YTMD
-        path: dist/${{ matrix.platform }}-${{ steps.arch.outputs.arch }}-YTMD.zip
+        name: ${{ matrix.platform }}-${{ steps.arch.outputs.arch }}-youtube-music-downloader
+        path: dist/${{ matrix.platform }}-${{ steps.arch.outputs.arch }}-youtube-music-downloader.zip
         
   release:
     needs: [build, generate-id]
@@ -116,12 +116,12 @@ jobs:
       id: create_release
       uses: softprops/action-gh-release@v1
       with:
-        name: YTMD-release-${{ needs.generate-id.outputs.release_id }}
+        name: YouTube Music Downloader v${{ needs.generate-id.outputs.release_id }}
         tag_name: ${{ startsWith(github.ref, 'refs/tags/') && github.ref_name || format('release-{0}', needs.generate-id.outputs.release_id) }}
         draft: false
         prerelease: false
         files: |
-          *-YTMD/*.zip
+          *-youtube-music-downloader/*.zip
         generate_release_notes: true
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }} 
