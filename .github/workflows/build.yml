@@ -1,0 +1,127 @@
+name: Build YTMD
+
+on:
+  push:
+    branches: [ main ]
+    tags:
+      - 'v*'
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  generate-id:
+    runs-on: ubuntu-latest
+    outputs:
+      release_id: ${{ steps.generate-id.outputs.id }}
+    steps:
+      - name: Generate random ID
+        id: generate-id
+        run: echo "id=$(cat /dev/urandom | tr -dc 'a-z0-9' | fold -w 6 | head -n 1)" >> $GITHUB_OUTPUT
+
+  build:
+    needs: generate-id
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+        include:
+          - os: ubuntu-latest
+            platform: linux
+          - os: windows-latest
+            platform: windows
+          - os: macos-latest
+            platform: macos
+
+    steps:
+    - uses: actions/checkout@v3
+    
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.10'
+        
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+        pip install pyinstaller
+        
+    - name: Get architecture
+      id: arch
+      shell: bash
+      run: |
+        ARCH=$(uname -m)
+        if [ "$ARCH" = "x86_64" ]; then
+          echo "arch=x64" >> $GITHUB_OUTPUT
+        elif [ "$ARCH" = "aarch64" ] || [ "$ARCH" = "arm64" ]; then
+          echo "arch=arm64" >> $GITHUB_OUTPUT
+        else
+          echo "arch=$ARCH" >> $GITHUB_OUTPUT
+        fi
+        
+    - name: Build with PyInstaller (Windows)
+      if: matrix.platform == 'windows'
+      run: |
+        pyinstaller --onefile --name YTMD main.py
+        
+    - name: Build with PyInstaller (Linux/MacOS)
+      if: matrix.platform != 'windows'
+      run: |
+        pyinstaller --onefile --name YTMD main.py
+        
+    - name: Prepare distribution folder
+      shell: bash
+      run: |
+        mkdir -p "dist/${{ matrix.platform }}-${{ steps.arch.outputs.arch }}-YTMD"
+        if [ "${{ matrix.platform }}" = "windows" ]; then
+          cp dist/YTMD.exe "dist/${{ matrix.platform }}-${{ steps.arch.outputs.arch }}-YTMD/"
+          cp README.md LICENSE requirements.txt "dist/${{ matrix.platform }}-${{ steps.arch.outputs.arch }}-YTMD/"
+        else
+          cp dist/YTMD "dist/${{ matrix.platform }}-${{ steps.arch.outputs.arch }}-YTMD/"
+          cp README.md LICENSE requirements.txt "dist/${{ matrix.platform }}-${{ steps.arch.outputs.arch }}-YTMD/"
+          chmod +x "dist/${{ matrix.platform }}-${{ steps.arch.outputs.arch }}-YTMD/YTMD"
+        fi
+        
+    - name: Create ZIP archive
+      shell: bash
+      run: |
+        cd dist
+        if [ "${{ matrix.platform }}" = "windows" ]; then
+          powershell Compress-Archive -Path "${{ matrix.platform }}-${{ steps.arch.outputs.arch }}-YTMD" -DestinationPath "${{ matrix.platform }}-${{ steps.arch.outputs.arch }}-YTMD.zip"
+        else
+          zip -r "${{ matrix.platform }}-${{ steps.arch.outputs.arch }}-YTMD.zip" "${{ matrix.platform }}-${{ steps.arch.outputs.arch }}-YTMD"
+        fi
+        
+    - name: Upload build artifact
+      uses: actions/upload-artifact@v3
+      with:
+        name: ${{ matrix.platform }}-${{ steps.arch.outputs.arch }}-YTMD
+        path: dist/${{ matrix.platform }}-${{ steps.arch.outputs.arch }}-YTMD.zip
+        
+  release:
+    needs: [build, generate-id]
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/') || github.event_name == 'workflow_dispatch'
+    
+    steps:
+    - name: Download all artifacts
+      uses: actions/download-artifact@v3
+      
+    - name: List downloaded artifacts
+      run: ls -R
+      
+    - name: Create release
+      id: create_release
+      uses: softprops/action-gh-release@v1
+      with:
+        name: YTMD-release-${{ needs.generate-id.outputs.release_id }}
+        tag_name: ${{ startsWith(github.ref, 'refs/tags/') && github.ref_name || format('release-{0}', needs.generate-id.outputs.release_id) }}
+        draft: false
+        prerelease: false
+        files: |
+          *-YTMD/*.zip
+        generate_release_notes: true
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }} 
