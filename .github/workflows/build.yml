@@ -17,7 +17,11 @@ jobs:
     steps:
       - name: Generate random ID
         id: generate-id
-        run: echo "id=$(cat /dev/urandom | tr -dc 'a-z0-9' | fold -w 6 | head -n 1)" >> $GITHUB_OUTPUT
+        run: |
+          TIMESTAMP=$(date +%s)
+          RANDOM_SUFFIX=$((RANDOM % 10000))
+          echo "id=${TIMESTAMP}-${RANDOM_SUFFIX}" >> $GITHUB_OUTPUT
+          echo "Generated ID: ${TIMESTAMP}-${RANDOM_SUFFIX}"
 
   build:
     needs: generate-id
