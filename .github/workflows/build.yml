@@ -39,10 +39,10 @@ jobs:
             platform: macos
 
     steps:
-    - uses: actions/checkout@v3
+    - uses: actions/checkout@v4
     
     - name: Set up Python
-      uses: actions/setup-python@v4
+      uses: actions/setup-python@v5
       with:
         python-version: '3.10'
         
@@ -64,16 +64,24 @@ jobs:
         else
           echo "arch=$ARCH" >> $GITHUB_OUTPUT
         fi
+    
+    - name: Find certifi location
+      id: certifi
+      shell: bash
+      run: |
+        CERTIFI_PATH=$(python -c "import certifi; print(certifi.where())")
+        echo "path=${CERTIFI_PATH}" >> $GITHUB_OUTPUT
+        echo "Certifi path: ${CERTIFI_PATH}"
         
     - name: Build with PyInstaller (Windows)
       if: matrix.platform == 'windows'
       run: |
-        pyinstaller --onefile --name youtube-music-downloader --add-data="youtube_downloader;youtube_downloader" main.py
+        pyinstaller --onefile --name youtube-music-downloader --add-data="youtube_downloader;youtube_downloader" --add-data="${{ steps.certifi.outputs.path }};." main.py
         
     - name: Build with PyInstaller (Linux/MacOS)
       if: matrix.platform != 'windows'
       run: |
-        pyinstaller --onefile --name youtube-music-downloader --add-data="youtube_downloader:youtube_downloader" main.py
+        pyinstaller --onefile --name youtube-music-downloader --add-data="youtube_downloader:youtube_downloader" --add-data="${{ steps.certifi.outputs.path }}:." main.py
         
     - name: Prepare distribution folder
       shell: bash
@@ -108,6 +116,8 @@ jobs:
     needs: [build, generate-id]
     runs-on: ubuntu-latest
     if: always() && !failure() && !cancelled()
+    permissions:
+      contents: write
     
     steps:
     - name: Download all artifacts
@@ -118,7 +128,7 @@ jobs:
       
     - name: Create release
       id: create_release
-      uses: softprops/action-gh-release@v1
+      uses: softprops/action-gh-release@v2
       with:
         name: YouTube Music Downloader v${{ needs.generate-id.outputs.release_id }}
         tag_name: ${{ startsWith(github.ref, 'refs/tags/') && github.ref_name || format('release-{0}', needs.generate-id.outputs.release_id) }}
