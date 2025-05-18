@@ -1,4 +1,4 @@
-# 🎵 YouTube Music Downloader
+<h1 align="center">🎵 YouTube Music Downloader</h1>
 
 <div align="center">
 
@@ -109,6 +109,7 @@ python main.py [YouTube URL] [OPTIONS]
 
 | Option | Description | Values | Default |
 |--------|-------------|--------|---------|
+| `-h, --help` | Show help information | Flag | False |
 | `--video` | Download as video instead of audio | Flag | Audio mode |
 | `--format` | Audio format to convert to | mp3, wav, opus, m4a | mp3 |
 | `--quality` | Quality setting for download | low, medium, high | medium |
@@ -116,6 +117,8 @@ python main.py [YouTube URL] [OPTIONS]
 | `--parallel-convert` | Number of simultaneous conversions | 0-8 (0 = sequential) | 1 |
 | `--output-dir` | Directory to save downloaded files | Any valid path | "downloads" |
 | `--force` | Override existing files | Flag | Skip existing files |
+| `--verbose` | Show verbose output | Flag | False |
+| `--version` | Show version information | Flag | False |
 
 ## 📝 Examples
 
@@ -156,6 +159,9 @@ python main.py https://www.youtube.com/watch?v=dQw4w9WgXcQ --output-dir "my_musi
 
 # Download a playlist, convert to M4A, with maximum parallelism
 python main.py https://www.youtube.com/playlist?list=PLdSUTU0oamAgi8Uwyfz5Xq-MHlIFLJRxH --format m4a --parallel-download 8 --parallel-convert 4
+
+# Download a playlist with verbose output
+python main.py https://www.youtube.com/playlist?list=PLdSUTU0oamAgi8Uwyfz5Xq-MHlIFLJRxH --verbose
 ```
 
 ## ⚙️ Configuration
@@ -191,6 +197,8 @@ If you encounter issues:
 2. Check the YouTube URL is still valid and accessible
 3. Ensure all dependencies are up to date with `pip install -r requirements.txt --upgrade`
 4. Verify FFmpeg is correctly installed with `ffmpeg -version`
+5. Check if the output directory exists and you have write permissions to it
+6. Try running with the `--verbose` flag to see more detailed output
 
 ## 📥 Downloads
 
