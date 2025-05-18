@@ -5,7 +5,9 @@ File management utilities for YouTube Music Downloader.
 import os
 import re
 import shutil
+import glob
 from pathlib import Path
+from functools import lru_cache
 
 class FileManager:
     """
@@ -26,6 +28,8 @@ class FileManager:
         self.output_dir = output_dir
         self.temp_dir = temp_dir
         self.ensure_directories()
+        self._file_cache = {}
+        self._cache_initialized = False
     
     def ensure_directories(self):
         """Create the output and temporary directories if they don't exist."""
@@ -45,9 +49,32 @@ class FileManager:
         # Remove invalid file characters
         return re.sub(r'[\\/*?:"<>|]', "", filename)
     
+    def _initialize_file_cache(self):
+        """Build a cache of existing files for faster lookup."""
+        if not os.path.exists(self.output_dir) or self._cache_initialized:
+            return
+        
+        # Clear existing cache
+        self._file_cache = {}
+        
+        # Scan the directory once and build a cache of lowercase filenames
+        for file in os.listdir(self.output_dir):
+            file_path = os.path.join(self.output_dir, file)
+            if os.path.isfile(file_path):
+                file_base = os.path.splitext(file)[0].lower()
+                file_ext = os.path.splitext(file)[1].lower()
+                
+                # Store both the base name and full filename
+                if file_base not in self._file_cache:
+                    self._file_cache[file_base] = []
+                self._file_cache[file_base].append((file, file_ext, file_path))
+        
+        self._cache_initialized = True
+    
     def file_exists(self, title, extension=None):
         """
         Check if a file with the given title exists in the output directory.
+        Uses a cached approach for better performance when checking multiple files.
         
         Args:
             title: Title to check for
@@ -58,24 +85,33 @@ class FileManager:
         """
         if not os.path.exists(self.output_dir):
             return False
+            
+        # Initialize the cache if needed
+        if not self._cache_initialized:
+            self._initialize_file_cache()
         
-        # Clean title to create a filename-safe string
-        clean_title = self.clean_filename(title)
+        # Clean and normalize the title
+        clean_title = self.clean_filename(title).lower()
         
-        for file in os.listdir(self.output_dir):
-            file_base = os.path.splitext(file)[0]
-            if clean_title.lower() == file_base.lower():
-                file_path = os.path.join(self.output_dir, file)
-                # Make sure it's a file and not a directory
-                if os.path.isfile(file_path):
-                    # If extension is specified, check that it matches
-                    if extension:
-                        if file.lower().endswith(f".{extension.lower()}"):
-                            return file_path
-                    else:
+        # Check if the title is in our cache
+        if clean_title in self._file_cache:
+            matching_files = self._file_cache[clean_title]
+            
+            # If extension is specified, find matching extension
+            if extension:
+                ext = f".{extension.lower()}"
+                for _, file_ext, file_path in matching_files:
+                    if file_ext.lower() == ext:
                         return file_path
+            # Otherwise return the first match
+            elif matching_files:
+                return matching_files[0][2]  # Return the path
         
         return False
+    
+    def invalidate_cache(self):
+        """Invalidate the file cache to force a refresh on next check."""
+        self._cache_initialized = False
     
     def move_file(self, source, destination=None):
         """
@@ -102,6 +138,10 @@ class FileManager:
         
         # Move the file
         os.rename(source, destination)
+        
+        # Invalidate cache since we've modified files
+        self.invalidate_cache()
+        
         return destination
     
     def cleanup_temp_directory(self):
