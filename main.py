@@ -8,6 +8,10 @@ This is the main entry point for the application.
 
 import sys
 import os
+import logging
+
+# Create a simple logger for startup debugging
+logger = logging.getLogger("youtube_downloader.main")
 
 # Add path handling to ensure modules are found when frozen with PyInstaller
 if getattr(sys, 'frozen', False) and hasattr(sys, '_MEIPASS'):
@@ -16,13 +20,16 @@ if getattr(sys, 'frozen', False) and hasattr(sys, '_MEIPASS'):
     sys.path.insert(0, base_path)
     # Fix working directory for frozen app
     os.chdir(base_path)
+    logger.debug(f"Running as frozen application. MEIPASS: {base_path}")
 else:
     # Running in a normal Python environment
     script_path = os.path.abspath(__file__)
     script_dir = os.path.dirname(script_path)
+    logger.debug(f"Running in normal Python environment. Script dir: {script_dir}")
     
     # Change to the script's directory to ensure we can find other resources
     if os.getcwd() != script_dir:
+        logger.debug(f"Changing directory from {os.getcwd()} to {script_dir}")
         os.chdir(script_dir)
 
 # Import needs to be after path adjustments

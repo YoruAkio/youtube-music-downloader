@@ -4,12 +4,16 @@ Audio converter module for converting video/audio files to different formats.
 
 import os
 import re
+import logging
 import subprocess
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import List, Dict, Any, Optional
 
 from youtube_downloader.core.downloader import DownloadResult, QUALITY_SETTINGS
 from youtube_downloader.utils.file_utils import FileManager
+
+# Create module-level logger
+logger = logging.getLogger("youtube_downloader.converter")
 
 class AudioConverter:
     """
@@ -19,20 +23,26 @@ class AudioConverter:
     audio formats using FFmpeg.
     """
     
-    def __init__(self, file_manager=None, progress_tracker=None):
+    def __init__(self, file_manager=None, progress_tracker=None, logger=None, verbose=False):
         """
         Initialize the audio converter.
         
         Args:
             file_manager: FileManager instance or None to create a new one
             progress_tracker: ProgressTracker instance or None
+            logger: Optional logger instance
+            verbose: Whether verbose logging is enabled
         """
         self.file_manager = file_manager or FileManager()
         self.progress_tracker = progress_tracker
+        self.logger = logger or logging.getLogger("youtube_downloader.converter")
+        self.verbose = verbose
         
         # Regex patterns for parsing FFmpeg output
         self.duration_regex = re.compile(r"Duration: (\d{2}):(\d{2}):(\d{2}\.\d{2})")
         self.time_regex = re.compile(r"time=(\d{2}):(\d{2}):(\d{2}\.\d{2})")
+        
+        self.logger.debug("AudioConverter initialized")
     
     def convert_file(self, result, output_format, quality, task_id=None):
         """

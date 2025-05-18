@@ -7,17 +7,22 @@ This module contains the main application class for the YouTube Music Downloader
 import sys
 import time
 import argparse
+import logging
 from rich.console import Console
 
 from youtube_downloader import __version__
 from youtube_downloader.utils.progress import ProgressTracker
 from youtube_downloader.utils.file_utils import FileManager
 from youtube_downloader.utils.ssl_helper import fix_ssl_certificates
+from youtube_downloader.utils.logging_utils import configure_logging
 from youtube_downloader.core.downloader import YouTubeDownloader
 from youtube_downloader.core.converter import AudioConverter
 
 # Fix SSL certificates for frozen applications
 fix_ssl_certificates()
+
+# Create a logger
+logger = logging.getLogger("youtube_downloader")
 
 class YouTubeMusicDownloaderApp:
     """Main application class for YouTube Music Downloader.
@@ -34,7 +39,10 @@ class YouTubeMusicDownloaderApp:
         self.progress_tracker = None
         self.downloader = None
         self.converter = None
+        self.logger = None  # Will be initialized when arguments are parsed
         
+
+    
     def parse_arguments(self):
         """Parse command-line arguments.
         
@@ -61,6 +69,8 @@ class YouTubeMusicDownloaderApp:
                            help='Directory to save downloaded files')
         parser.add_argument('--force', action='store_true', 
                            help='Force download even if files already exist')
+        parser.add_argument('--verbose', action='store_true',
+                           help='Enable verbose logging for debugging')
         parser.add_argument('--version', action='version', version=f'%(prog)s {__version__}')
         
         self.args = parser.parse_args()
@@ -72,15 +82,35 @@ class YouTubeMusicDownloaderApp:
         This method follows the Dependency Inversion Principle by injecting
         dependencies rather than creating tightly coupled components.
         """
-        self.file_manager = FileManager(output_dir=self.args.output_dir)
-        self.progress_tracker = ProgressTracker(console=self.console, max_visible=5)
+        self.logger.debug("Initializing FileManager")
+        self.file_manager = FileManager(
+            output_dir=self.args.output_dir,
+            logger=self.logger,
+            verbose=self.args.verbose
+        )
+        
+        self.logger.debug("Initializing ProgressTracker")
+        self.progress_tracker = ProgressTracker(
+            console=self.console, 
+            max_visible=5,
+            logger=self.logger,
+            verbose=self.args.verbose
+        )
+        
+        self.logger.debug("Initializing YouTubeDownloader")
         self.downloader = YouTubeDownloader(
             file_manager=self.file_manager, 
-            progress_tracker=self.progress_tracker
+            progress_tracker=self.progress_tracker,
+            logger=self.logger,
+            verbose=self.args.verbose
         )
+        
+        self.logger.debug("Initializing AudioConverter")
         self.converter = AudioConverter(
             file_manager=self.file_manager, 
-            progress_tracker=self.progress_tracker
+            progress_tracker=self.progress_tracker,
+            logger=self.logger,
+            verbose=self.args.verbose
         )
     
     def print_info(self, url_type):
@@ -139,9 +169,11 @@ class YouTubeMusicDownloaderApp:
         with self.progress_tracker.create_progress() as progress:
             try:
                 start_time = time.time()
+                self.logger.info("Starting download process")
                 self.console.print("\n[bold cyan]Starting downloads...[/bold cyan]")
                 
                 # Download the videos
+                self.logger.debug(f"Download settings: format={self.args.format}, quality={self.args.quality}, is_video={self.args.video}, parallel={self.args.parallel_download}")
                 results = self.downloader.process_url(
                     self.args.url, 
                     output_format=self.args.format,
@@ -151,10 +183,12 @@ class YouTubeMusicDownloaderApp:
                     parallel=self.args.parallel_download
                 )
                 
+                self.logger.info("Downloads completed")
                 self.console.print("\n[bold cyan]Downloads completed![/bold cyan]")
                 
                 # Convert files if needed
                 if not self.args.video and any(r.status == 'success' for r in results):
+                    self.logger.info("Starting audio conversion process")
                     self.console.print("\n[bold cyan]Processing audio conversions...[/bold cyan]")
                     results = self.converter.batch_convert(
                         results,
@@ -164,21 +198,26 @@ class YouTubeMusicDownloaderApp:
                     )
                 
                 # Print summary
+                self.logger.info("Preparing download summary")
                 self.print_download_summary(results)
                 
                 # Clean up temporary files
+                self.logger.debug("Cleaning up temporary files")
                 self.file_manager.cleanup_temp_directory()
                 
                 elapsed_time = time.time() - start_time
+                self.logger.info(f"Total execution time: {elapsed_time:.2f} seconds")
                 self.console.print(f"\n[bold green]Total execution time: {elapsed_time:.2f} seconds[/bold green]")
                 
                 return 0
                 
             except KeyboardInterrupt:
+                self.logger.warning("Operation cancelled by user")
                 self.console.print("\n[bold yellow]Operation cancelled by user. Cleaning up...[/bold yellow]")
                 self.file_manager.cleanup_temp_directory()
                 return 1
             except Exception as e:
+                self.logger.error(f"An error occurred: {str(e)}", exc_info=True)
                 self.console.print(f"\n[bold red]An error occurred: {str(e)}[/bold red]")
                 self.file_manager.cleanup_temp_directory()
                 return 1
@@ -196,17 +235,27 @@ class YouTubeMusicDownloaderApp:
         # Parse command-line arguments
         self.parse_arguments()
         
+        # Set up logging based on verbose flag
+        self.logger = configure_logging(verbose=self.args.verbose)
+        
+        self.logger.debug("Starting YouTube Music Downloader")
+        
         # Initialize components
+        self.logger.debug("Initializing application components")
         self.initialize_components()
         
         # Validate URL
+        self.logger.debug(f"Validating URL: {self.args.url}")
         url_type = self.downloader.validate_url(self.args.url)
         if not url_type:
+            self.logger.error(f"Invalid YouTube URL: {self.args.url}")
             self.console.print("[bold red]Error: Invalid YouTube URL. Please provide a valid YouTube video or playlist URL.[/bold red]")
             return 1
         
         # Print information about the download
+        self.logger.info(f"Processing {url_type} URL: {self.args.url}")
         self.print_info(url_type)
         
         # Process the download and conversion
+        self.logger.debug("Starting download and conversion process")
         return self.download_and_convert() 

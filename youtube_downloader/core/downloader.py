@@ -4,6 +4,7 @@ YouTube downloader module for downloading videos and playlists.
 
 import os
 import re
+import logging
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass
 from typing import List, Dict, Any, Optional, Callable
@@ -12,6 +13,9 @@ import yt_dlp
 
 from youtube_downloader.utils.file_utils import FileManager
 from youtube_downloader.utils.progress import ProgressTracker
+
+# Create module-level logger
+logger = logging.getLogger("youtube_downloader.downloader")
 
 # Regular expressions to validate YouTube URLs
 YOUTUBE_VIDEO_REGEX = r'^(https?://)?(www\.)?(youtube\.com/watch\?v=|youtu\.be/)([a-zA-Z0-9_-]{11})'
@@ -41,16 +45,22 @@ class YouTubeDownloader:
     and downloading videos from YouTube.
     """
     
-    def __init__(self, file_manager=None, progress_tracker=None):
+    def __init__(self, file_manager=None, progress_tracker=None, logger=None, verbose=False):
         """
         Initialize the YouTube downloader.
         
         Args:
             file_manager: FileManager instance or None to create a new one
             progress_tracker: ProgressTracker instance or None to create a new one
+            logger: Optional logger instance
+            verbose: Whether verbose logging is enabled
         """
         self.file_manager = file_manager or FileManager()
         self.progress_tracker = progress_tracker
+        self.logger = logger or logging.getLogger("youtube_downloader.downloader")
+        self.verbose = verbose
+        
+        self.logger.debug("YouTubeDownloader initialized")
         
     def validate_url(self, url):
         """
@@ -62,11 +72,16 @@ class YouTubeDownloader:
         Returns:
             str or None: 'video', 'playlist', or None if invalid
         """
+        self.logger.debug(f"Validating URL: {url}")
+        
         if re.match(YOUTUBE_VIDEO_REGEX, url):
+            self.logger.debug(f"URL is a valid YouTube video: {url}")
             return 'video'
         elif re.match(YOUTUBE_PLAYLIST_REGEX, url):
+            self.logger.debug(f"URL is a valid YouTube playlist: {url}")
             return 'playlist'
         else:
+            self.logger.debug(f"URL is not a valid YouTube video or playlist: {url}")
             return None
     
     def get_video_info(self, url):
