@@ -14,9 +14,31 @@ import os
 import re
 import argparse
 import subprocess
+import ssl
+import certifi
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import Dict, List, Optional, Any, Callable, Union
 from urllib.parse import urlparse, parse_qs
+
+# Fix SSL certificate verification for compiled executables
+def fix_ssl_certificates():
+    try:
+        # Check if we're in a PyInstaller bundle
+        if getattr(sys, 'frozen', False):
+            # We are running in a PyInstaller bundle
+            os.environ['SSL_CERT_FILE'] = certifi.where()
+            os.environ['REQUESTS_CA_BUNDLE'] = certifi.where()
+            
+            # Create a default SSL context with the certifi certificates
+            ssl_context = ssl.create_default_context(cafile=certifi.where())
+            ssl._create_default_https_context = lambda: ssl_context
+            
+            print("SSL certificates configured for compiled executable")
+    except Exception as e:
+        print(f"Warning: Could not configure SSL certificates: {str(e)}")
+
+# Call this function early
+fix_ssl_certificates()
 
 import yt_dlp
 from rich.console import Console
